@@ -1,5 +1,6 @@
 from dataclasses import dataclass, field
 import dataclasses
+from datetime import datetime, timedelta
 from enum import Enum
 from typing import List, Dict, Tuple
 
@@ -57,6 +58,49 @@ class Inner:
 @dataclass
 class Outer:
     inner: Inner
+
+
+@dataclass
+class MyFloat:
+    x: float
+
+
+@dataclass
+class CustomDateEncoding:
+    start_time: datetime
+    duration: timedelta
+
+    @property
+    def end_time(self):
+        return self.start_time + self.duration
+
+
+def test_customer_encoding_rountrip():
+    d = {'start_time': '2020-02-20 20:20', 'duration': (5, 0, 0)}
+    decoders = {
+        datetime: lambda s: datetime.strptime(s, '%Y-%m-%d %H:%M'),
+        timedelta: lambda values: timedelta(*values)
+    }
+    encoders = {
+        datetime: lambda ts: ts.strftime('%Y-%m-%d %H:%M'),
+        timedelta: lambda td: (td.days, td.seconds, td.microseconds)
+    }
+    obj = howard.from_dict(d, CustomDateEncoding, decoders=decoders)
+    d_new = howard.to_dict(obj, encoders=encoders)
+    assert isinstance(obj.start_time, datetime)
+    assert isinstance(obj.duration, timedelta)
+    assert obj.end_time == datetime(2020, 2, 25, 20, 20)
+    assert d == d_new
+
+
+def test_custom_float_roundtrip():
+    d = {'x': 5.0}
+    decoders = {float: lambda x: x}
+    encoders = {float: lambda x: x}
+    obj = howard.from_dict(d, MyFloat, decoders=decoders)
+    d_new = howard.to_dict(obj, encoders=encoders)
+    assert obj.x == 5.0
+    assert d_new == d
 
 
 @pytest.mark.parametrize('d, t', [
